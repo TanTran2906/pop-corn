@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StarRating from "./StarRating"
+import { useLocalStorageState } from "./useLocalStorageState";
+import { useKey } from "./useKey";
 
 // const tempMovieData = [
 //   {
@@ -56,7 +58,12 @@ const KEY = "b9d32c8b"
 
 export default function App() {
   const [movies, setMovies] = useState([]);
-  const [watched, setWatched] = useState([]);
+  // const [watched, setWatched] = useState([]);
+  // const [watched, setWatched] = useState(function () {
+  //   const storedValue = localStorage.getItem("watched")
+  //   return JSON.parse(storedValue)
+  // });
+  const [watched, setWatched] = useLocalStorageState([], "watched")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [query, setQuery] = useState("");
@@ -72,11 +79,18 @@ export default function App() {
 
   function handleAddMovie(movie) {
     setWatched(watched => [...watched, movie])
+    // localStorage.setItem("watched", JSON.stringify([...watched,movie]))
   }
 
   function handleDeleteMovie(id) {
     setWatched(watched => watched.filter(movie => movie.imdbID !== id))
+    // localStorage.setItem("watched", JSON.stringify([...watched,movie]))
   }
+
+  //Local Storage: lưu vào bộ nhớ cục bộ mỗi khi watched thay đổi (add,remove)
+  // useEffect(function () {
+  //   localStorage.setItem("watched", JSON.stringify(watched))
+  // }, [watched])
 
   useEffect(function () {
     //vai trò của AbortController là để hủy bỏ (abort) yêu cầu mạng (fetch) khi thành phần React được unmount hoặc khi giá trị của biến query thay đổi.
@@ -183,7 +197,31 @@ function Logo() {
 }
 
 function Search({ query, setQuery }) {
+  const inputEl = useRef(null)
 
+  //Custom hook
+  useKey("Enter", function () {
+    if (document.activeElement === inputEl.current)
+      return;
+
+    inputEl.current.focus()
+    setQuery("")
+  })
+
+  // useEffect(function () {
+  //   function callback(e) {
+  //     if (e.code === "Enter") {
+  //       if (document.activeElement === inputEl.current)
+  //         return;
+
+  //       inputEl.current.focus()
+  //       setQuery("")
+  //     }
+  //   }
+
+  //   document.addEventListener("keydown", callback)
+  //   return () => document.removeEventListener("keydown", callback)
+  // }, [setQuery])
 
   return (
     <input
@@ -192,6 +230,7 @@ function Search({ query, setQuery }) {
       placeholder="Search movies..."
       value={query}
       onChange={(e) => setQuery(e.target.value)}
+      ref={inputEl}
     />
   )
 }
@@ -282,6 +321,13 @@ function MovieDetail({ selectedId, onCloseMovie, onAddWatchedMovie, watched }) {
   const [movie, setMovie] = useState({}) //{}: vì fetch về 1 {}
   const [isLoading, setIsLoading] = useState(false)
   const [movieRating, setMovieRating] = useState(0)
+  const countRef = useRef(0)
+
+  useEffect(function () {
+    if (movieRating) countRef.current += 1
+  }, [movieRating])
+
+
 
   const isWatched = watched.map(movie => movie.imdbID).includes(selectedId)
   const userRated = watched.find((movie) => selectedId === movie.imdbID)?.userRating
@@ -308,25 +354,27 @@ function MovieDetail({ selectedId, onCloseMovie, onAddWatchedMovie, watched }) {
       imdbRating: Number(imdbRating),
       runtime: Number(runtime.split(" ").at(0)),
       userRating: movieRating,
+      countRatingDecisions: countRef
     }
 
     onAddWatchedMovie(newWatchedMovie)
     onCloseMovie(null)
   }
 
-  useEffect(function () {
-    function callback(e) {
-      if (e.code === 'Escape')
-        onCloseMovie()
-    }
+  useKey("Escape", onCloseMovie) //Custom hook
+  // useEffect(function () {
+  //   function callback(e) {
+  //     if (e.code === 'Escape')
+  //       onCloseMovie()
+  //   }
 
-    document.addEventListener('keydown', callback)
+  //   document.addEventListener('keydown', callback)
 
-    // Sau khi component unmount hoặc khi giá trị của onCloseMovie thay đổi, event listener sẽ được gỡ bỏ
-    return function () {
-      document.removeEventListener('keydown', callback)
-    }
-  }, [onCloseMovie])
+  //   // Sau khi component unmount hoặc khi giá trị của onCloseMovie thay đổi, event listener sẽ được gỡ bỏ
+  //   return function () {
+  //     document.removeEventListener('keydown', callback)
+  //   }
+  // }, [onCloseMovie])
 
   // console.log(title, year)
   //Có thể xử lý lỗi nếu muốn: Ở đây, giả sử bỏ qua TH lỗi
